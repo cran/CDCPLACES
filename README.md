@@ -1,8 +1,10 @@
 <!-- badges: start -->
   [![R-CMD-check](https://github.com/brendensm/CDCPLACES/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/brendensm/CDCPLACES/actions/workflows/R-CMD-check.yaml)
+  [![CRAN_Status_Badge](https://www.r-pkg.org/badges/version/CDCPLACES)](https://cran.r-project.org/package=CDCPLACES)
+
   <!-- badges: end -->
 
-# Functions to Access the 'CDC PLACES' API
+# Access the 'CDC PLACES' API
 
 This package allows users to seamlessly query the Centers for Disease Control and Prevention's (CDC) Population Level Analysis and Community Estimates (PLACES) API.
 
@@ -19,6 +21,11 @@ To install the latest development version run:
 
 ``` r
 devtools::install_github("brendensm/CDCPLACES")
+```
+
+To install from CRAN:
+```r
+install.packages("CDCPLACES")
 ```
 
 # Main Functions
