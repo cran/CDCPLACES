@@ -8,6 +8,8 @@
 #'@param county Specify the county of the desired data using the full name of the county, with a capital letter.
 #'@param release Specify the year of release for the PLACES data set. Currently supports years 2020-2023.
 #'@param geometry if FALSE (the default), return a regular data frame of PLACES data. If TRUE, uses the tigris package to return an sf data frame with simple feature geometry in the 'geometry' column.
+#'@param cat Specify the category of measures to return. Overrides the argument 'measure'. Category ID must be used here. Options include 'DISABILT', 'HLTHOUT', 'HLTHSTAT', 'PREVENT', 'RISKBEH', and 'SOCLNEED' (for release 2024). To see all the available categories and their corresponding variables, run get_dictionary.
+#'@param age_adjust For queries on the county level only. If TRUE, returns only the age-adjusted values.
 #'
 #'@examples
 #'get_places(geography = "county", state = "MI", measure = "SLEEP", release = "2023")
@@ -21,14 +23,20 @@
 #'@importFrom zctaCrosswalk zcta_crosswalk
 #'
 #'@export get_places
-#'@returns A tibble that contains observations for each measure (age-adjusted and unadjusted prevalence for counties) and geographic level.
+#'@returns A data frame that contains observations for each measure and geographic level.
 
 get_places <- function(geography = "county", state = NULL, measure = NULL, county = NULL,
-                       release = "2023", geometry = FALSE){
+                       release = "2024", geometry = FALSE, cat = NULL, age_adjust = NULL){
+
+  if(!is.null(cat)){
+    if(!is.null(measure)){
+      message("A category was provided. Any items included in the 'measure' argument will be overrideen.")
+    }
+    measure = unique(measures[measures$categoryid == cat,]$measureid)
+  }
 
   # Assigning base url
-
-  if(release == "2023"){
+  if(release == "2024"){
     if(geography == "county"){
 
       base <-  "https://data.cdc.gov/resource/swc5-untb.json?$query=SELECT%20*%20"
@@ -41,7 +49,20 @@ get_places <- function(geography = "county", state = NULL, measure = NULL, count
 
       base <- "https://data.cdc.gov/resource/qnzd-25i4.json?$query=SELECT%20*%20"
 
+    }else{
+      stop("Geographic level not supported. Please enter 'census', 'county', or 'zcta'.")
+    }
+  }else if(release == "2023"){
+    if(geography == "county"){
 
+      base <- "https://data.cdc.gov/resource/h3ej-a9ec.json?$query=SELECT%20*%20"
+
+    } else if(geography == "census"){
+
+      base <- "https://data.cdc.gov/resource/em5e-5hvn.json?$query=SELECT%20*%20"
+    }else if(geography == "zcta"){
+
+      base <- "https://data.cdc.gov/resource/9umn-c3jf.json?$query=SELECT%20*%20"
 
     }else{
       stop("Geographic level not supported. Please enter 'census', 'county', or 'zcta'.")
@@ -144,7 +165,7 @@ get_places <- function(geography = "county", state = NULL, measure = NULL, count
       places_out <-  parse_request(places1$content)
 
     }else{
-      print(paste0(base, formatted_zctas(zlist), measure_text(measure), "%20LIMIT%2050000"))
+     # print(paste0(base, formatted_zctas(zlist), measure_text(measure), "%20LIMIT%2050000"))
       places1 <- paste0(base, formatted_zctas(zlist), measure_text(measure), "%20LIMIT%2050000") |>
         curl::curl_fetch_memory()
 
@@ -402,6 +423,14 @@ if(isTRUE(geometry)){
 
   }
 
+  if(geography == "county"){
+
+    if(isTRUE(age_adjust)){
+      places_out <- places_out[places_out$datavaluetypeid == "AgeAdjPrv",]
+    }
+
+  }
+
   return(places_out)
 
 }
@@ -414,23 +443,17 @@ if(isTRUE(geometry)){
 #'@noRd
 
 check_measures <- function(x, ryear){
-  if(ryear == "2023"){
-    if(!(x %in% measures23$measureid)){
-      stop(paste("Please enter a valid measure for release year", paste0(ryear, "."), "For a full list of valid measures, use the function 'get_measures'."))
+
+    if(ryear != "2024"){
+      if(x %in% measures[measures$categoryid == "SOCLNEED",]$measureid){
+        stop("Health-related social needs variables are currently only available for 2024 release data.")
+      }
     }
-  }else if(ryear == "2022"){
-    if(!(x %in% measures22$measureid)){
-      stop(paste("Please enter a valid measure for release year", paste0(ryear, "."), "For a full list of valid measures, use the function 'get_measures'."))
+
+    if(!(x %in% measures$measureid)){
+      stop(paste("Please enter a valid measure for release year. For a full list of valid measures, use the function 'get_dictionary'."))
     }
-  }else if(ryear == "2021"){
-    if(!(x %in% measures21$measureid)){
-      stop(paste("Please enter a valid measure for release year", paste0(ryear, "."), "For a full list of valid measures, use the function 'get_measures'."))
-    }
-  }else if(ryear == "2020"){
-    if(!(x %in% measures20$measureid)){
-      stop(paste("Please enter a valid measure for release year", paste0(ryear, "."), "For a full list of valid measures, use the function 'get_measures'."))
-    }
-  }
+
 }
 
 #'check if states can be queried or if entered correctly
