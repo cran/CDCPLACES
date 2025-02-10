@@ -7,7 +7,9 @@
 #'
 #'@examples
 #'# First save the data
+#'\dontrun{
 #'dictionary <- get_dictionary()
+#'}
 #'# Then view the data frame
 #'# View(dictionary)
 #'
@@ -23,7 +25,7 @@ get_dictionary <- function(){
 
   base <- "https://data.cdc.gov/resource/m35w-spkz.json"
 
-  check_api(base)
+  if(is.null(check_api(base))){       return(NULL)     }
 
   resp <- curl::curl_fetch_memory(base)
 
