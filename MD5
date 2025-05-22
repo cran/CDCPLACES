@@ -1,4 +1,4 @@
-637250a53cfdac76c823a4b073654940 *DESCRIPTION
+8272043bfe6be9f35307e36facdad590 *DESCRIPTION
 71bc86be6218abab7ef7204102539f9d *LICENSE
 709c1735785bdb3ca7cd31171a390aba *NAMESPACE
 43090cfb7e01225097eb9d66a660766e *NEWS.md
@@ -6,8 +6,8 @@ dc21129c12f68e6c751db6fd88f21de2 *R/get_dictionary.R
 691788486434ada74dd064e695caab8b *R/get_places.R
 0b262a472ee76d7e0b01a672d211176b *R/globals.R
 c02de987bde90a19330d56a73f5b96fd *R/sysdata.rda
-737b38f0874511c0a93a0dcdcd15a611 *README.md
+6e0f767901fce27067b4b5d500b2d371 *README.md
 3a51bda9440dee0eb8339b0307ccea60 *man/get_dictionary.Rd
 7748a1917284e40448b4f34357757bdc *man/get_places.Rd
 45368ce1b256c88f9c4b632fc05eaeda *tests/testthat.R
-5f92fff4e32250d6b0810d39017a26cd *tests/testthat/test-get_places.R
+c7afe4737fe5863248606000eb81e1a9 *tests/testthat/test-get_places.R
