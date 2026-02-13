@@ -1,176 +1,232 @@
+# Live API integration tests — skipped on CRAN
+#
+# These tests make real HTTP requests to the CDC PLACES Socrata APIs.
+# They are skipped on CRAN and when the network/API is unavailable.
 
-# First test for internet
+skip_if_api_unavailable <- function() {
+  testthat::skip_on_cran()
+  testthat::skip_if_offline()
 
-if(isTRUE(curl::has_internet())){
+  resp <- tryCatch(
+    curl::curl_fetch_memory("https://data.cdc.gov/resource/swc5-untb.json?$query=SELECT%20*%20%20LIMIT%201"),
+    error = function(e) NULL
+  )
 
-  # check if APIs are online
-
-  base23_cy_val <- test_check_api("https://data.cdc.gov/resource/swc5-untb.json")
-  base23_cs_val <- test_check_api("https://data.cdc.gov/resource/cwsq-ngmh.json")
-  base22_cy_val <- test_check_api("https://data.cdc.gov/resource/duw2-7jbt.json")
-  base22_cs_val <- test_check_api("https://data.cdc.gov/resource/nw2y-v4gm.json")
-  base21_cy_val <- test_check_api("https://data.cdc.gov/resource/pqpp-u99h.json")
-  base21_cs_val <- test_check_api("https://data.cdc.gov/resource/373s-ayzu.json")
-  base20_cy_val <- test_check_api("https://data.cdc.gov/resource/dv4u-3x3q.json")
-  base20_cs_val <- test_check_api("https://data.cdc.gov/resource/4ai3-zynv.json")
-
-  if(sum(
-    base23_cy_val,
-    base23_cs_val,
-    base22_cy_val,
-    base22_cs_val,
-    base21_cy_val,
-    base21_cs_val,
-    base20_cy_val,
-    base20_cs_val
-  ) < 1){
-
-    # Initial API Access by Year
-    years <- c("2020", "2021", "2022", "2023")
-
-    # county tests for each year (one state, one measure)
-
-    for (i in years){
-      test_that(paste0("function accesses county api ", i, "(one state, one measure)"), {
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = "MI", measure = "SLEEP", release = i), "data.frame")
-      })
-    }
-
-    # county test for each year (multple states, one measure)
-    for (i in years){
-      test_that(paste0("function accesses county api", i, "(multiple states, one measure)"), {
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = c("OH", "WI"), measure = "ACCESS2", release = i), "data.frame")
-      })
-    }
-
-
-    # county test for each year (multiple measures, one state)
-    for (i in years){
-      test_that(paste0("function access county api", i, "(multiple measures, one state)"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = c("WI"), measure = c("ACCESS2", "SLEEP"), release = i), "data.frame")
-      })
-    }
-
-
-    # county tests for each year (multiple measures and states)
-
-    for (i in years){
-      test_that(paste0("function access county api", i, "(multiple measures, multiple states), more states"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = c("WI", "OH", "MI", "CA"), measure = c("ACCESS2", "SLEEP"), release = i), "data.frame")
-      })
-    }
-
-
-
-    # county tests for each year (one state, one measure)
-
-    for (i in years){
-      test_that(paste0("function accesses county api ", i, "(one state, one measure)"), {
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = "MI", measure = "SLEEP", release = i), "data.frame")
-      })
-    }
-
-    # county test for each year (multple states, one measure)
-    for (i in years){
-      test_that(paste0("function accesses county api", i, "(multiple states, one measure)"), {
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = c("OH", "WI"), measure = "ACCESS2"), "data.frame")
-      })
-    }
-
-
-    # county test for each year (multiple measures, one state)
-    for (i in years){
-      test_that(paste0("function access county api", i, "(multiple measures, one state)"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = c("WI"), measure = c("ACCESS2", "SLEEP"), release = i), "data.frame")
-      })
-    }
-
-
-    # county tests for each year (multiple measures and states)
-
-    for (i in years){
-      test_that(paste0("function access county api", i, "(multiple measures, multiple states), more states"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(state = c("WI", "OH", "MI", "CA"), measure = c("ACCESS2", "SLEEP"), release = i), "data.frame")
-      })
-    }
-
-    for (i in years){
-      test_that(paste0("function access county api", i, "(multiple measures, multiple states), more measures"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(geography = "county", state = c("WI", "OH"), measure = c("STROKE", "SLEEP", "DIABETES", "BINGE"), release = i), "data.frame")
-      })
-    }
-
-    ######################### Census level tests #################################
-
-    # census test for each year (one state, one measure)
-
-    for (i in years){
-      test_that(paste0("function accesses census api ", i, "(one state, one measure)"), {
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(geography = "census", state = "MI", measure = "SLEEP", release = i), "data.frame")
-      })
-    }
-
-    # census test for each year (multple states, one measure)
-    for (i in years){
-      test_that(paste0("function accesses census api", i, "(multiple states, one measure)"), {
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(geography = "census", state = c("OH", "WI"), measure = "ACCESS2"), "data.frame")
-      })
-    }
-
-
-    # census test for each year (multiple measures, one state)
-    for (i in years){
-      test_that(paste0("function access census api", i, "(multiple measures, one state)"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(geography = "census", state = c("WI"), measure = c("STROKE", "SLEEP"), release = i), "data.frame")
-      })
-    }
-
-
-    # census tests for each year (multiple measures and states)
-
-    for (i in years){
-      test_that(paste0("function access census api", i, "(multiple measures, multiple states), more states"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(geography = "census", state = c("WI", "OH", "MI", "CA"), measure = c("STROKE", "SLEEP"), release = i), "data.frame")
-      })
-    }
-
-    for (i in years){
-      test_that(paste0("function access census api", i, "(multiple measures, multiple states), more measures"),{
-        testthat::skip_on_cran()
-        expect_s3_class(get_places(geography = "census", state = c("WI", "OH"), measure = c("DIABETES", "SLEEP", "STROKE", "BINGE"), release = i), "data.frame")
-      })
-    }
-
-  }else{
-    test_that("query returns null with no internet",{
-      testthat::skip_on_cran()
-      testthat::expect_null(get_places(state = "MI", measure = "SLEEP"))
-    })
-
+  if (is.null(resp) || resp$status_code != 200) {
+    testthat::skip("CDC PLACES API is not available")
   }
-
-
 }
 
+# --- County tests -------------------------------------------------------------
 
+test_that("county: single state, single measure", {
+  skip_if_api_unavailable()
 
+  result <- get_places(state = "MI", measure = "SLEEP", release = "2025")
 
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(all(c("data_value", "measureid", "stateabbr", "locationid") %in% names(result)))
+  expect_true(all(result$stateabbr == "MI"))
+  expect_true(all(result$measureid == "SLEEP"))
+  expect_true(is.numeric(result$data_value))
+})
 
+test_that("county: multiple states, multiple measures", {
+  skip_if_api_unavailable()
 
+  result <- get_places(
+    state = c("MI", "OH"),
+    measure = c("SLEEP", "ACCESS2"),
+    release = "2025"
+  )
 
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(all(result$stateabbr %in% c("MI", "OH")))
+  expect_true(all(result$measureid %in% c("SLEEP", "ACCESS2")))
+})
 
+test_that("county: state only, no measure returns all measures", {
+  skip_if_api_unavailable()
 
+  result <- get_places(state = "MI", release = "2025")
 
+  expect_s3_class(result, "data.frame")
+  expect_gt(length(unique(result$measureid)), 1)
+})
+
+test_that("county: measure only, no state returns all states", {
+  skip_if_api_unavailable()
+
+  result <- get_places(measure = "SLEEP", release = "2025")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(length(unique(result$stateabbr)), 1)
+})
+
+test_that("county: older release year (2020) still works", {
+  skip_if_api_unavailable()
+
+  result <- get_places(state = "MI", measure = "SLEEP", release = "2020")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+})
+
+# --- County with county filter ------------------------------------------------
+
+test_that("county: county filter returns data", {
+  skip_if_api_unavailable()
+
+  result <- get_places(state = "MI", measure = "SLEEP", county = "Wayne", release = "2025")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+})
+
+# --- age_adjust ---------------------------------------------------------------
+
+test_that("county: age_adjust = TRUE returns only age-adjusted values", {
+  skip_if_api_unavailable()
+
+  result <- get_places(state = "MI", measure = "SLEEP", release = "2025", age_adjust = TRUE)
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(all(result$datavaluetypeid == "AgeAdjPrv"))
+})
+
+# --- cat argument -------------------------------------------------------------
+
+test_that("county: cat argument returns measures from that category", {
+  skip_if_api_unavailable()
+
+  result <- get_places(state = "MI", cat = "PREVENT", release = "2025")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  prevent_ids <- unique(measures[measures$categoryid == "PREVENT", ]$measureid)
+  expect_true(all(result$measureid %in% prevent_ids))
+})
+
+test_that("county: cat overrides measure with a message", {
+  skip_if_api_unavailable()
+
+  expect_message(
+    result <- get_places(state = "MI", measure = "SLEEP", cat = "PREVENT", release = "2025"),
+    "overridden"
+  )
+
+  expect_s3_class(result, "data.frame")
+  # Should contain PREVENT measures, not just SLEEP
+  expect_gt(length(unique(result$measureid)), 1)
+})
+
+# --- Tract tests --------------------------------------------------------------
+
+test_that("tract: single state, single measure", {
+  skip_if_api_unavailable()
+
+  result <- get_places(geography = "tract", state = "MI", measure = "SLEEP", release = "2025")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(all(result$stateabbr == "MI"))
+  expect_true(all(result$measureid == "SLEEP"))
+})
+
+test_that("tract: multiple states, multiple measures", {
+  skip_if_api_unavailable()
+
+  result <- get_places(
+    geography = "tract",
+    state = c("WI", "OH"),
+    measure = c("STROKE", "SLEEP"),
+    release = "2025"
+  )
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(all(result$stateabbr %in% c("WI", "OH")))
+  expect_true(all(result$measureid %in% c("STROKE", "SLEEP")))
+})
+
+# --- ZCTA tests ---------------------------------------------------------------
+
+test_that("zcta: single state, single measure", {
+  skip_if_api_unavailable()
+
+  result <- get_places(geography = "zcta", state = "MI", measure = "SLEEP", release = "2025")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(is.numeric(result$data_value))
+})
+
+test_that("zcta: single state, no measure returns all measures", {
+  skip_if_api_unavailable()
+
+  result <- get_places(geography = "zcta", state = "DC", release = "2025")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(length(unique(result$measureid)), 1)
+})
+
+test_that("zcta: errors when state is missing", {
+  expect_error(
+    get_places(geography = "zcta", measure = "SLEEP", release = "2025"),
+    "state"
+  )
+})
+
+# --- Place tests --------------------------------------------------------------
+
+test_that("place: single state, single measure", {
+  skip_if_api_unavailable()
+
+  result <- get_places(geography = "place", state = "MI", measure = "SLEEP", release = "2025")
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(all(c("data_value", "measureid", "stateabbr", "locationid") %in% names(result)))
+  expect_true(all(result$stateabbr == "MI"))
+  expect_true(all(result$measureid == "SLEEP"))
+  expect_true(is.numeric(result$data_value))
+})
+
+test_that("place: age_adjust = TRUE returns only age-adjusted values", {
+  skip_if_api_unavailable()
+
+  result <- get_places(geography = "place", state = "DC", measure = "SLEEP", release = "2025", age_adjust = TRUE)
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+  expect_true(all(result$datavaluetypeid == "AgeAdjPrv"))
+})
+
+# --- get_dictionary() ---------------------------------------------------------
+
+test_that("get_dictionary returns a data frame of measures", {
+  skip_if_api_unavailable()
+
+  result <- get_dictionary()
+
+  expect_s3_class(result, "data.frame")
+  expect_gt(nrow(result), 0)
+})
+
+# --- Graceful failure ---------------------------------------------------------
+
+test_that("get_places returns NULL gracefully when there is no internet", {
+  skip_if_api_unavailable()
+
+  # Mock has_internet to return FALSE
+  local_mocked_bindings(has_internet = function() FALSE, .package = "curl")
+
+  expect_message(
+    result <- get_places(state = "MI", measure = "SLEEP"),
+    "No internet"
+  )
+  expect_null(result)
+})

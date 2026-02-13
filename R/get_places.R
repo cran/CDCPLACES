@@ -2,14 +2,14 @@
 #'
 #'Use this function to access CDC PLACES API data. Measures are sourced from the Behavioral Risk Factor Surveillance System and the American Community Survey ACS.
 #'
-#'@param geography The level of desired geography. Currently supports 'county', 'census', and 'zcta'.
+#'@param geography The level of desired geography. Currently supports 'county', 'place', 'tract', and 'zcta'.
 #'@param state Specify the state of the desired data using the two letter abbreviation. Supports multiple states if desired.
-#'@param measure Specify the measures of the data pull. Supports multiple states if desired. For a full list of available measures, see the function 'get_dictionary'.
-#'@param county Specify the county of the desired data using the full name of the county, with a capital letter.
-#'@param release Specify the year of release for the PLACES data set. Currently supports years 2020-2024.
+#'@param measure Specify the measures of the data pull. Supports multiple measures if desired. For a full list of available measures, see the function 'get_dictionary'.
+#'@param county Specify the county of the desired data using the full name of the county, with a capital letter. Not supported for 'place' or 'zcta' geography (use 'state' to filter instead).
+#'@param release Specify the year of release for the PLACES data set. Currently supports years 2020-2025.
 #'@param geometry if FALSE (the default), return a regular data frame of PLACES data. If TRUE, uses the tigris package to return an sf data frame with simple feature geometry in the 'geometry' column.
 #'@param cat Specify the category of measures to return. Overrides the argument 'measure'. Category ID must be used here. Options include 'DISABILT', 'HLTHOUT', 'HLTHSTAT', 'PREVENT', 'RISKBEH', and 'SOCLNEED' (for release 2024). To see all the available categories and their corresponding variables, run get_dictionary.
-#'@param age_adjust For queries on the county level only. If TRUE, returns only the age-adjusted values.
+#'@param age_adjust For queries on the county or place level. If TRUE, returns only the age-adjusted values.
 #'
 #'@examples
 #'\dontrun{
@@ -18,99 +18,47 @@
 #'measure = c("SLEEP", "ACCESS2"), release = "2023")
 #'}
 #'@importFrom curl has_internet curl_fetch_memory
-#'@importFrom tigris counties tracts
+#'@importFrom tigris counties places tracts zctas
 #'@importFrom sf st_as_sf
 #'@importFrom yyjsonr read_json_str
-#'@importFrom zctaCrosswalk zcta_crosswalk
 #'
 #'@export get_places
 #'@returns A data frame that contains observations for each measure and geographic level.
 
 get_places <- function(geography = "county", state = NULL, measure = NULL, county = NULL,
-                       release = "2024", geometry = FALSE, cat = NULL, age_adjust = NULL){
+                       release = "2025", geometry = FALSE, cat = NULL, age_adjust = NULL){
+
+  if(geography == "census"){
+    stop("As of version 1.1.11, 'census' geography has been changed to 'tract' for clarity. Please adjust your code accordingly.")
+  }
+
+  if(!is.null(county) && geography == "place"){
+    stop("The 'county' parameter is not supported for place geography. Use 'state' to filter place data instead.")
+  }
 
   if(!is.null(cat)){
     if(!is.null(measure)){
-      message("A category was provided. Any items included in the 'measure' argument will be overrideen.")
+      message("A category was provided. Any items included in the 'measure' argument will be overridden.")
     }
     measure = unique(measures[measures$categoryid == cat,]$measureid)
   }
 
   # Assigning base url
-  if(release == "2024"){
-    if(geography == "county"){
+  base_url <- api_urls[api_urls$release %in% release &
+                     api_urls$geography %in% geography,]$url
 
-      base <-  "https://data.cdc.gov/resource/swc5-untb.json?$query=SELECT%20*%20"
 
-    } else if(geography == "census"){
-
-      base <- "https://data.cdc.gov/resource/cwsq-ngmh.json?$query=SELECT%20*%20"
-
-    }else if(geography == "zcta"){
-
-      base <- "https://data.cdc.gov/resource/qnzd-25i4.json?$query=SELECT%20*%20"
-
-    }else{
-      stop("Geographic level not supported. Please enter 'census', 'county', or 'zcta'.")
-    }
-  }else if(release == "2023"){
-    if(geography == "county"){
-
-      base <- "https://data.cdc.gov/resource/h3ej-a9ec.json?$query=SELECT%20*%20"
-
-    } else if(geography == "census"){
-
-      base <- "https://data.cdc.gov/resource/em5e-5hvn.json?$query=SELECT%20*%20"
-    }else if(geography == "zcta"){
-
-      base <- "https://data.cdc.gov/resource/9umn-c3jf.json?$query=SELECT%20*%20"
-
-    }else{
-      stop("Geographic level not supported. Please enter 'census', 'county', or 'zcta'.")
-    }
-
-  }else if(release == "2022"){
-    if(geography == "county"){
-
-      base <- "https://data.cdc.gov/resource/duw2-7jbt.json?$query=SELECT%20*%20"
-
-    } else if(geography == "census"){
-
-      base <- "https://data.cdc.gov/resource/nw2y-v4gm.json?$query=SELECT%20*%20"
-
-    }else{
-      stop("Geographic level not supported. Please enter 'census' or 'county'.")
-    }
-
-  }else if(release == "2021"){
-    if(geography == "county"){
-
-      base <- "https://data.cdc.gov/resource/pqpp-u99h.json?$query=SELECT%20*%20"
-
-    } else if(geography == "census"){
-
-      base <- "https://data.cdc.gov/resource/373s-ayzu.json?$query=SELECT%20*%20"
-
-    }else{
-      stop("Geographic level not supported. Please enter 'census' or 'county'.")
-    }
-
-  }else if(release == "2020"){
-    if(geography == "county"){
-
-      base <- "https://data.cdc.gov/resource/dv4u-3x3q.json?$query=SELECT%20*%20"
-
-    } else if(geography == "census"){
-
-      base <- "https://data.cdc.gov/resource/4ai3-zynv.json?$query=SELECT%20*%20"
-
-    }else{
-      stop("Geographic level not supported. Please enter 'census' or 'county'.")
-    }
-
-  }else{
-    stop("Release year is not available. Please enter a year 2020-2024.")
+  if(length(base_url) == 0){
+    stop("Geographic level or release year not supported.")
   }
+
+  if(is.na(base_url)){
+    stop("ZCTA data is not available for the 2024 release. ",
+         "The CDC did not publish a long-format ZCTA dataset for this release year. ",
+         "Please use release '2023' or '2025' instead.")
+  }
+
+  base <- paste0(base_url, "?$query=SELECT%20*%20")
 
   # Check for internet
 
@@ -163,38 +111,43 @@ get_places <- function(geography = "county", state = NULL, measure = NULL, count
       stop("You must select at least one state to query ZCTA data.")
     }else if(is.null(measure)){
 
-      places1 <- paste0(base, formatted_zctas(zlist), "%20LIMIT%2050000") |>
-        curl::curl_fetch_memory()
-
-      places_out <-  parse_request(places1$content)
+      places_out <- fetch_zcta_batched(base, zlist)
 
     }else{
-     # print(paste0(base, formatted_zctas(zlist), measure_text(measure), "%20LIMIT%2050000"))
-      places1 <- paste0(base, formatted_zctas(zlist), measure_text(measure), "%20LIMIT%2050000") |>
-        curl::curl_fetch_memory()
 
-      places_out <- parse_request(places1$content)
+      places_out <- fetch_zcta_batched(base, zlist, measure)
 
     }
 
-    places_out[8:11] <- lapply(places_out[8:11], as.numeric)
+    numeric_cols <- c("data_value", "low_confidence_limit",
+                       "high_confidence_limit", "data_value_footnote_symbol")
+    numeric_cols <- intersect(numeric_cols, names(places_out))
+    places_out[numeric_cols] <- lapply(places_out[numeric_cols], as.numeric)
 
     if(isTRUE(geometry)){
 
-      geo <- data.frame()
+      if(release %in% c("2024", "2025")){
+
+        geo <- tigris::zctas(year = 2020)
+        geo <- geo[geo$ZCTA5CE20 %in% places_out$locationid, c("ZCTA5CE20", "geometry")]
+
+        places_out <- merge(places_out, geo, by.x = "locationid", by.y = "ZCTA5CE20") |>
+          sf::st_as_sf()
+
+      }else{
+
+        geo <- data.frame()
 
         for(i in state){
-
           geo_add <- tigris::zctas(state = i, year = 2010)
-
           geo_add <- geo_add[,c("ZCTA5CE10", "geometry")]
-
           geo <- rbind(geo, geo_add)
-
         }
 
         places_out <- merge(places_out, geo, by.x = "locationid", by.y = "ZCTA5CE10") |>
           sf::st_as_sf()
+
+      }
 
     }
 
@@ -286,7 +239,7 @@ get_places <- function(geography = "county", state = NULL, measure = NULL, count
         base,
         format_query(state, "state", "WHERE", geography),
         "%20",
-        format_query(toupper(county), "county", "AND", geography),
+        format_query(to_title_case(county), "county", "AND", geography),
         "%20",
         "%20LIMIT%205000000"
       ) |>
@@ -306,7 +259,7 @@ get_places <- function(geography = "county", state = NULL, measure = NULL, count
         base,
         format_query(measure, "measure", "WHERE", geography),
         "%20",
-        format_query(toupper(county), "county", "AND", geography),
+        format_query(to_title_case(county), "county", "AND", geography),
         "%20LIMIT%205000000"
       ) |>
         curl::curl_fetch_memory()
@@ -326,7 +279,7 @@ get_places <- function(geography = "county", state = NULL, measure = NULL, count
         base,
         format_query(state, "state", "WHERE", geography),
         "%20",
-        format_query(toupper(county), "county", "AND", geography),
+        format_query(to_title_case(county), "county", "AND", geography),
         "%20",
         format_query(measure, "measure", "AND", geography),
        "%20LIMIT%205000000"
@@ -388,46 +341,49 @@ if(isTRUE(geometry)){
 
 
 
-  }else if(geography == "census"){
+  }else if(geography == "tract"){
 
     if(is.null(state)){
       stop("You must provide state names in order to add shapefiles to this query.", call. = FALSE)
-    }else if(length(state) > 1){
-
-      geo <- data.frame()
-
-      for (i in state){
-
-        geo_add <- tigris::tracts(state = i, year = 2010) #|>
-
-        geo_add <- geo_add[,c("GEOID10", "geometry")]
-
-        geo <- rbind(geo, geo_add)
-
-      }
-
-      places_out <- merge(places_out, geo, by.x = "locationid", by.y = "GEOID10") |>
-        sf::st_as_sf()
-
-    }else{
-
-      geo <- tigris::tracts(state = state, year = 2010) #|>
-
-      geo <- geo[,c("GEOID10", "geometry")]
-
-      places_out <- merge(places_out, geo, by.x = "locationid", by.y = "GEOID10") |>
-        sf::st_as_sf()
-
-
-      }
-
-
     }
+
+    tract_year <- if(release %in% c("2024", "2025")) 2020 else 2010
+    tract_geoid <- if(tract_year == 2020) "GEOID" else "GEOID10"
+
+    geo <- data.frame()
+
+    for (i in state){
+      geo_add <- tigris::tracts(state = i, year = tract_year)
+      geo_add <- geo_add[, c(tract_geoid, "geometry")]
+      geo <- rbind(geo, geo_add)
+    }
+
+    places_out <- merge(places_out, geo, by.x = "locationid", by.y = tract_geoid) |>
+      sf::st_as_sf()
+
+  }else if(geography == "place"){
+
+    if(is.null(state)){
+      stop("You must provide state names in order to add shapefiles to this query.", call. = FALSE)
+    }
+
+    geo <- data.frame()
+
+    for (i in state){
+      geo_add <- tigris::places(state = i, year = 2020)
+      geo_add <- geo_add[, c("GEOID", "geometry")]
+      geo <- rbind(geo, geo_add)
+    }
+
+    places_out <- merge(places_out, geo, by.x = "locationid", by.y = "GEOID") |>
+      sf::st_as_sf()
+
+  }
 
 
   }
 
-  if(geography == "county"){
+  if(geography %in% c("county", "place")){
 
     if(isTRUE(age_adjust)){
       places_out <- places_out[places_out$datavaluetypeid == "AgeAdjPrv",]
@@ -495,15 +451,8 @@ check_counties <- function(x){
 #'@noRd
 check_api <- function(x){
 
-  stop_quietly <- function() {
-    opt <- options(show.error.messages = FALSE)
-    on.exit(options(opt))
-    stop()
-  }
-
   try_GET <- function(x, ...) {
     tryCatch(
-      #httr::GET(url = x, httr::timeout(10), ...),
       curl::curl_fetch_memory(url = x),
       error = function(e) conditionMessage(e),
       warning = function(w) conditionMessage(w)
@@ -512,25 +461,18 @@ check_api <- function(x){
 
   resp <- try_GET(x)
 
-  if(resp$status_code != 200){
-    #httr::message_for_status(resp)
-    message("Status code:", resp$status_code)
-    message("For full response code details visit: https://dev.socrata.com/docs/response-codes.html.")
+  if(is.character(resp)){
+    message("API request failed: ", resp)
     return(invisible(NULL))
-    #stop_quietly()
-
-  }else{
-    return(invisible(1))
   }
 
-  # if(httr::http_error(resp)){
-  #   httr::message_for_status(resp)
-  #   message("\nFor full response code details visit: https://dev.socrata.com/docs/response-codes.html.")
-  #   stop_quietly()
-  #   #return(invisible(NULL))
-  # }
+  if(resp$status_code != 200){
+    message("Status code: ", resp$status_code)
+    message("For full response code details visit: https://dev.socrata.com/docs/response-codes.html.")
+    return(invisible(NULL))
+  }
 
-
+  return(invisible(1))
 
 }
 
@@ -542,7 +484,6 @@ test_check_api <- function(x){
 
   try_GET <- function(x, ...) {
     tryCatch(
-     # httr::GET(url = x, httr::timeout(10), ...),
       curl::curl_fetch_memory(url = x),
       error = function(e) conditionMessage(e),
       warning = function(w) conditionMessage(w)
@@ -551,13 +492,17 @@ test_check_api <- function(x){
 
   resp <- try_GET(x)
 
-  if(resp$status_code != 200){
-    #httr::message_for_status(resp)
-    message("Status code:", resp$status_code)
+  if(is.character(resp)){
+    message("API request failed: ", resp)
     return(invisible(1))
-  }else{
-    return(invisible(0))
   }
+
+  if(resp$status_code != 200){
+    message("Status code: ", resp$status_code)
+    return(invisible(1))
+  }
+
+  return(invisible(0))
 
 }
 
@@ -567,66 +512,29 @@ test_check_api <- function(x){
 #'pastes together the required url to query the API from a state/county's ZCTAs.
 #'@param my_vector vector of zip codes to add to the query
 #'@noRd
+#'
 formatted_zctas <- function(my_vector) {
-
-  firstprefix <- "WHERE%20((upper(%60locationname%60)%20LIKE%20'%25"
-  firstsuffix <- "%25')%20"
-
-  # Define the prefix and suffix
-  bodyprefix <- "OR%20(upper(%60locationname%60)%20LIKE%20'%25"
-  bodysuffix <- "%25')%20"
-
-  lastsuffix <- "%25'))"
-
-  first_vec <- my_vector[1]
-
-  last_vec <- my_vector[length(my_vector)]
-
-  body <- my_vector[2:(length(my_vector)-1)]
-
-
-  part_one <- paste0(firstprefix, first_vec, firstsuffix, collapse = "")
-
-  part_two <- paste0(bodyprefix, body, bodysuffix, collapse = "")
-
-  part_three <- paste0(bodyprefix, last_vec, lastsuffix, collapse = "")
-
-  # Concatenate the elements of the vector with the prefix and suffix
-  formatted_strings <- paste0(part_one, part_two, part_three, collapse = "")
-
-  return(formatted_strings)
-}
-
-#'pastes together the required measures to query the API for a ZCTA query.
-#'@param my_vector vector of zip codes to add to the query
-#'@noRd
-measure_text <- function(measure){
-
-  if(length(measure) == 1){
-    paste0("%20AND%20((%60measureid%60%20%3D%20'", measure, "'))", collapse = "")
-
-  }else if(length(measure) < 3){
-    first_measure <- measure[1]
-    last_measure <- measure[length(measure)]
-
-    paste0("%20AND%20((%60measureid%60%20%3D%20'", first_measure, "')%20",
-           "OR%20(upper(%60measureid%60)%20LIKE%20'%25", last_measure, "%25'))")
-
-  }else if(length(measure) >= 3){
-
-    first_measure <- measure[1]
-    last_measure <- measure[length(measure)]
-
-    middle <- measure[2:(length(measure) - 1)]
-
-    one <- paste0("%20AND%20((%60measureid%60%20%3D%20'", first_measure, "')%20")
-    two <- paste0("OR%20(upper(%60measureid%60)%20LIKE%20'%25", middle, "%25')", collapse = "")
-    three <- paste0("OR%20(upper(%60measureid%60)%20LIKE%20'%25", last_measure, "%25'))")
-
-    return(paste0(one, two, three, collapse = ""))
-
+  if(length(my_vector) == 1) {
+    return(paste0("WHERE%20locationname%20%3D%20'", my_vector, "'"))
   }
 
+  # Use IN operator instead of multiple LIKE statements
+  zcta_list <- paste(my_vector, collapse = "','")
+  paste0("WHERE%20locationname%20IN%20('", zcta_list, "')")
+}
+
+
+#'pastes together the required measures to query the API for a ZCTA query.
+#'@param measure vector of measures to add to the query
+#'@noRd
+measure_text <- function(measure){
+  if(length(measure) == 1) {
+    paste0("%20AND%20measureid%20%3D%20'", measure, "'", collapse = "")
+  } else {
+    # Use IN operator instead of multiple LIKE statements
+    measure_list <- paste(measure, collapse = "','")
+    paste0("%20AND%20measureid%20IN%20('", measure_list, "')")
+  }
 }
 
 #'pastes together the required variable names to query the API.
@@ -635,49 +543,82 @@ measure_text <- function(measure){
 #'@param operator AND or WHERE
 #'@param type the geography type of the query
 #'@noRd
-format_query <-  function(x, var, operator, type){
+format_query <- function(x, var, operator, type){
 
+  # Map var to actual column name
   if(var == "measure"){
     var <- "measureid"
-  }else if(var == "state"){
-    var <-  "stateabbr"
-  }else if(var == "county"){
-    if(type == "county"){
+  } else if(var == "state"){
+    var <- "stateabbr"
+  } else if(var == "county"){
+    if(type %in% c("county", "place")){
       var <- "locationname"
-    }else if(type == "census"){
+    } else if(type == "tract"){
       var <- "countyname"
     }
   }
 
+  # Build query using IN operator for cleaner, shorter URLs
   if(length(x) == 1){
-    paste0( operator, "%20(upper(%60", var, "%60)%20LIKE%20'%25", x, "%25')", collapse = "")
-
-  }else if(length(x) < 3){
-    first <- x[1]
-    last <- x[length(x)]
-
-    paste0( operator, "%20((upper(%60", var, "%60)%20LIKE%20'%25", first, "%25')",
-           "%20OR%20(upper(%60", var, "%60)%20LIKE%20'%25", last, "%25'))")
-
-  }else if(length(x) >= 3){
-
-    first <- x[1]
-    last <- x[length(x)]
-
-    middle <- x[2:(length(x) - 1)]
-
-    one <- paste0( operator, "%20((upper(%60", var, "%60)%20LIKE%20'%25", first, "%25')%20")
-    two <- paste0("OR%20(upper(%60", var, "%60)%20LIKE%20'%25", middle, "%25')", collapse = "")
-    three <- paste0("%20OR%20(upper(%60", var, "%60)%20LIKE%20'%25", last, "%25'))")
-
-    return(paste0(one, two, three, collapse = ""))
-
+    paste0(operator, "%20", var, "%20%3D%20'", x, "'")
+  } else {
+    values <- paste(x, collapse = "','")
+    paste0(operator, "%20", var, "%20IN%20('", values, "')")
   }
+}
+
+#'Convert a string to title case to match API county name format
+#'@param x character vector to convert
+#'@noRd
+to_title_case <- function(x) {
+  vapply(x, function(s) {
+    words <- strsplit(tolower(s), " ")[[1]]
+    paste(vapply(words, function(w) {
+      paste0(toupper(substring(w, 1, 1)), substring(w, 2))
+    }, character(1)), collapse = " ")
+  }, character(1), USE.NAMES = FALSE)
+}
+
+#'Fetch ZCTA data, batching requests if the URL would exceed the max length
+#'@param base the base API URL with query prefix
+#'@param zlist vector of ZCTAs to query
+#'@param measure optional measure filter
+#'@param max_url_length maximum URL length before batching (Socrata limit ~7000)
+#'@noRd
+fetch_zcta_batched <- function(base, zlist, measure = NULL, max_url_length = 7000){
+
+  suffix <- if(is.null(measure)){
+    "%20LIMIT%205000000"
+  }else{
+    paste0(measure_text(measure), "%20LIMIT%205000000")
+  }
+
+  full_url <- paste0(base, formatted_zctas(zlist), suffix)
+
+  if(nchar(full_url) <= max_url_length){
+    resp <- curl::curl_fetch_memory(full_url)
+    return(parse_request(resp$content))
+  }
+
+  # Estimate batch size that keeps URL under the limit
+  overhead <- nchar(paste0(base, "WHERE%20locationname%20IN%20('')", suffix))
+  chars_per_zcta <- 8  # 5 digits + "','"
+  batch_size <- max(1, floor((max_url_length - overhead) / chars_per_zcta))
+
+  batches <- split(zlist, ceiling(seq_along(zlist) / batch_size))
+
+  results <- lapply(batches, function(batch){
+    url <- paste0(base, formatted_zctas(batch), suffix)
+    resp <- curl::curl_fetch_memory(url)
+    parse_request(resp$content)
+  })
+
+  do.call(rbind, results)
 
 }
 
-#'parses the json of a the httr2 request
-#'@param x httr2 request object
+#'parses the json content from an API response
+#'@param x raw content from curl response
 #'@noRd
 parse_request <- function(x){
 
@@ -709,9 +650,15 @@ check_multiples <- function(state, county){
   final_sum <- aggregate(. ~ county_name, data = initial_sum, FUN = length)
   final_sum <- final_sum[, c("county_name", "n")]
 
-  if(nrow(final_sum > 0)){
+  if(nrow(final_sum) > 0){
 
     if(max(final_sum$n) > 1){
+
+      if(!interactive()){
+        message("Overlapping county names detected. Including all counties in non-interactive mode.")
+        return(trial$zcta)
+      }
+
       message("You have overlapping county names.")
       print(initial_sum[initial_sum$county_name %in% final_sum[final_sum$n>1,]$county_name, -3])
 
@@ -721,8 +668,7 @@ check_multiples <- function(state, county){
       if(response1 == "y"){
         message("OK, we will include all counties.")
 
-        trial$zcta
-
+        return(trial$zcta)
 
       }else{
 
@@ -741,9 +687,7 @@ check_multiples <- function(state, county){
             ),
           ]
 
-          return(
-            fil$zcta
-          )
+          return(fil$zcta)
 
         }else{
 
@@ -754,7 +698,7 @@ check_multiples <- function(state, county){
             ),
           ]
 
-          fil$zcta
+          return(fil$zcta)
 
         }
 
@@ -765,10 +709,12 @@ check_multiples <- function(state, county){
 
   }
 
+  return(trial$zcta)
+
 }
 
 
-#'checks if returned county/census data contains overlapping county names
+#'checks if returned county/census tract data contains overlapping county names
 #'@param state names of states given in get_places call
 #'@param county names of counties given in get_places call
 #'@param places the queried places data
@@ -788,9 +734,15 @@ check_multiples_cc <- function(state, county, places, geography){
   final_sum <- aggregate(. ~ county_name, data = initial_sum, FUN = length)
   final_sum <- final_sum[, c("county_name", "n")]
 
-  if(nrow(final_sum > 0)){
+  if(nrow(final_sum) > 0){
 
     if(max(final_sum$n) > 1){
+
+      if(!interactive()){
+        message("Overlapping county names detected. Including all counties in non-interactive mode.")
+        return(places)
+      }
+
       message("You have overlapping county names.")
       print(initial_sum[initial_sum$county_name %in% final_sum[final_sum$n>1,]$county_name, -3])
 
@@ -800,7 +752,7 @@ check_multiples_cc <- function(state, county, places, geography){
       if(response1 == "y"){
         message("OK, we will include all counties.")
 
-        places
+        return(places)
 
       }else{
 
@@ -808,49 +760,25 @@ check_multiples_cc <- function(state, county, places, geography){
 
         response2 <- readline("Response:  ")
 
-        if(nchar(response2) > 2){
-
-          sep_response <- strsplit(response2, split = " ")[[1]]
-
-
-            if(geography == "county"){
-              places[
-                !(places$stateabbr %in% sep_response &
-                    places$locationid %in% unique(initial_sum$county_fips[initial_sum$county_name %in% final_sum$county_name[final_sum$n > 1]])),
-              ]
-
-            }else if (geography == "census"){
-              places[
-                !(places$stateabbr %in% sep_response &
-                    places$countyfips %in% unique(initial_sum$county_fips[initial_sum$county_name %in% final_sum$county_name[final_sum$n > 1]])),
-              ]
-            }
-
-        }else{
-
-
-          if(geography == "county"){
-
-            places[
-              !(places$stateabbr %in% response2 &
-                places$locationid %in% unique(initial_sum$county_fips[initial_sum$county_name %in% final_sum$county_name[final_sum$n > 1]])),
-            ]
-
-          }else if (geography == "census"){
-
-
-            places_filtered <- places[
-              !(places$stateabbr %in% response2 &
-                  places$countyfips %in% unique(initial_sum$county_fips[initial_sum$county_name %in% final_sum$county_name[final_sum$n > 1]])),
-            ]
-
-
-          }
-
-
-
+        exclude_states <- if(nchar(response2) > 2){
+          strsplit(response2, split = " ")[[1]]
+        } else {
+          response2
         }
 
+        overlap_fips <- unique(initial_sum$county_fips[initial_sum$county_name %in% final_sum$county_name[final_sum$n > 1]])
+
+        if(geography == "county"){
+          return(places[
+            !(places$stateabbr %in% exclude_states &
+                places$locationid %in% overlap_fips),
+          ])
+        }else if (geography == "tract"){
+          return(places[
+            !(places$stateabbr %in% exclude_states &
+                places$countyfips %in% overlap_fips),
+          ])
+        }
 
       }
 
@@ -858,12 +786,6 @@ check_multiples_cc <- function(state, county, places, geography){
 
   }
 
-}
+  return(places)
 
-#'Upper case the first letter of a string
-#'@param x string to capitalize
-#'@noRd
-firstup <- function(x) {
-  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
-  x
 }

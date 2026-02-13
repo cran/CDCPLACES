@@ -9,28 +9,28 @@ get_places(
   state = NULL,
   measure = NULL,
   county = NULL,
-  release = "2024",
+  release = "2025",
   geometry = FALSE,
   cat = NULL,
   age_adjust = NULL
 )
 }
 \arguments{
-\item{geography}{The level of desired geography. Currently supports 'county', 'census', and 'zcta'.}
+\item{geography}{The level of desired geography. Currently supports 'county', 'place', 'tract', and 'zcta'.}
 
 \item{state}{Specify the state of the desired data using the two letter abbreviation. Supports multiple states if desired.}
 
-\item{measure}{Specify the measures of the data pull. Supports multiple states if desired. For a full list of available measures, see the function 'get_dictionary'.}
+\item{measure}{Specify the measures of the data pull. Supports multiple measures if desired. For a full list of available measures, see the function 'get_dictionary'.}
 
-\item{county}{Specify the county of the desired data using the full name of the county, with a capital letter.}
+\item{county}{Specify the county of the desired data using the full name of the county, with a capital letter. Not supported for 'place' or 'zcta' geography (use 'state' to filter instead).}
 
-\item{release}{Specify the year of release for the PLACES data set. Currently supports years 2020-2024.}
+\item{release}{Specify the year of release for the PLACES data set. Currently supports years 2020-2025.}
 
 \item{geometry}{if FALSE (the default), return a regular data frame of PLACES data. If TRUE, uses the tigris package to return an sf data frame with simple feature geometry in the 'geometry' column.}
 
 \item{cat}{Specify the category of measures to return. Overrides the argument 'measure'. Category ID must be used here. Options include 'DISABILT', 'HLTHOUT', 'HLTHSTAT', 'PREVENT', 'RISKBEH', and 'SOCLNEED' (for release 2024). To see all the available categories and their corresponding variables, run get_dictionary.}
 
-\item{age_adjust}{For queries on the county level only. If TRUE, returns only the age-adjusted values.}
+\item{age_adjust}{For queries on the county or place level. If TRUE, returns only the age-adjusted values.}
 }
 \value{
 A data frame that contains observations for each measure and geographic level.
